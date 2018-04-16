@@ -36,7 +36,7 @@ def setup_args():
 
 
 def write_to_file(out_file, line):
-    out_file.write(line.encode('utf8') + '\n')
+    out_file.write(line + '\n')
 
 
 def data_from_json(filename):
@@ -233,13 +233,13 @@ def preprocess_and_write(dataset, tier, out_dir):
     print ("Processed %i examples of total %i\n" % (num_exs, num_exs + num_mappingprob + num_tokenprob + num_spanalignprob))
 
     # shuffle examples
-    indices = range(len(examples))
+    indices = list(range(len(examples)))
     np.random.shuffle(indices)
 
-    with open(os.path.join(out_dir, tier +'.context'), 'w') as context_file,  \
-         open(os.path.join(out_dir, tier +'.question'), 'w') as question_file,\
-         open(os.path.join(out_dir, tier +'.answer'), 'w') as ans_text_file, \
-         open(os.path.join(out_dir, tier +'.span'), 'w') as span_file:
+    with open(os.path.join(out_dir, tier +'.context'), 'w',encoding='utf-8') as context_file,  \
+         open(os.path.join(out_dir, tier +'.question'), 'w',encoding='utf-8') as question_file,\
+         open(os.path.join(out_dir, tier +'.answer'), 'w',encoding='utf-8') as ans_text_file, \
+         open(os.path.join(out_dir, tier +'.span'), 'w',encoding='utf-8') as span_file:
 
         for i in indices:
             (context, question, answer, answer_span) = examples[i]

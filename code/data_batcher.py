@@ -89,8 +89,15 @@ def padded(token_batch, batch_pad=0):
       List (length batch_size) of padded of lists of ints.
         All are same length - batch_pad if batch_pad!=0, otherwise the maximum length in token_batch
     """
-    maxlen = max(map(lambda x: len(x), token_batch)) if batch_pad == 0 else batch_pad
-    return map(lambda token_list: token_list + [PAD_ID] * (maxlen - len(token_list)), token_batch)
+    if batch_pad==0:
+        maxlen=max([len(token) for token in token_batch])
+    else:
+        maxlen=batch_pad
+    retval=[]
+    for token in token_batch:
+        newtoken=token+[PAD_ID]*(maxlen-len(token))
+        retval.append(newtoken)
+    return retval
 
 
 def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size, context_len, question_len, discard_long):
@@ -156,7 +163,7 @@ def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size
     examples = sorted(examples, key=lambda e: len(e[2]))
 
     # Make into batches and append to the list batches
-    for batch_start in xrange(0, len(examples), batch_size):
+    for batch_start in range(0, len(examples), batch_size):
 
         # Note: each of these is a list length batch_size of lists of ints (except on last iter when it might be less than batch_size)
         context_ids_batch, context_tokens_batch, qn_ids_batch, qn_tokens_batch, ans_span_batch, ans_tokens_batch = zip(*examples[batch_start:batch_start+batch_size])
@@ -185,7 +192,7 @@ def get_batch_generator(word2id, context_path, qn_path, ans_path, batch_size, co
       discard_long: If True, discard any examples that are longer than context_len or question_len.
         If False, truncate those exmaples instead.
     """
-    context_file, qn_file, ans_file = open(context_path), open(qn_path), open(ans_path)
+    context_file, qn_file, ans_file = open(context_path,encoding='utf-8'), open(qn_path,encoding='utf-8'), open(ans_path,encoding='utf-8')
     batches = []
 
     while True:

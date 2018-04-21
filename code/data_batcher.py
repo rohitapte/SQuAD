@@ -3,8 +3,8 @@
 import os
 import random
 import numpy as np
-from word_and_character_vectors import PAD_ID,UNK_ID,get_glove,get_char
-from sentence_operations import split_by_whitespace,tokens_to_word_ids,tokens_to_char_ids,pad_words,convert_ids_to_word_vectors,pad_characters,convert_ids_to_char_vectors
+from nlp_functions.word_and_character_vectors import PAD_ID,UNK_ID,get_glove,get_char
+from nlp_functions.sentence_operations import split_by_whitespace,tokens_to_word_ids,tokens_to_char_ids,pad_words,convert_ids_to_word_vectors,pad_characters,convert_ids_to_char_vectors
 
 def padded(token_batch, batch_pad=0):
     """

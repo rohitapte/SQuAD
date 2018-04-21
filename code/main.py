@@ -16,6 +16,8 @@
 
 from __future__ import absolute_import
 from __future__ import division
+import sys
+sys.path.append('../../python_libraries')
 
 import os
 import io
@@ -27,7 +29,7 @@ import tensorflow as tf
 
 from qa_model import QAModel
 #from vocab import get_glove
-from word_and_character_vectors import get_glove,get_char
+from nlp_functions.word_and_character_vectors import get_glove,get_char
 from official_eval_helper import get_json_data, generate_answers
 
 

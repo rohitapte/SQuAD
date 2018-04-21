@@ -28,7 +28,7 @@ from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.ops import embedding_ops
 
 from evaluate import exact_match_score, f1_score
-from data_batcher import get_batch_generator
+from data_batcher import SQuadDataObject
 from pretty_print import print_example
 from modules import RNNEncoder, SimpleSoftmaxLayer, BasicAttn
 
@@ -38,7 +38,7 @@ logging.basicConfig(level=logging.INFO)
 class QAModel(object):
     """Top-level Question Answering module"""
 
-    def __init__(self, FLAGS, id2word, word2id, emb_matrix):
+    def __init__(self, FLAGS, id2word, word2id, emb_matrix,id2char,char2id,char_embed_matrix):
         """
         Initializes the QA model.
 
@@ -52,11 +52,15 @@ class QAModel(object):
         self.FLAGS = FLAGS
         self.id2word = id2word
         self.word2id = word2id
+        #self.id2char=id2char
+        #self.char2id=char2id
+        #self.char_embed_matrix=char_embed_matrix
+        self.dataObject=SQuadDataObject(word2id,id2word,emb_matrix,None,None,None,None,None,None,char2id,id2char,char_embed_matrix,self.FLAGS.data_dir,self.FLAGS.batch_size,self.FLAGS.context_len,self.FLAGS.question_len,self.FLAGS.context_word_len,self.FLAGS.question_word_len)
 
         # Add all parts of the graph
         with tf.variable_scope("QAModel", initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, uniform=True)):
             self.add_placeholders()
-            self.add_embedding_layer(emb_matrix)
+            #self.add_embedding_layer(emb_matrix)
             self.build_graph()
             self.add_loss()
 
@@ -86,10 +90,12 @@ class QAModel(object):
         # Add placeholders for inputs.
         # These are all batch-first: the None corresponds to batch_size and
         # allows you to run the same model with variable batch_size
-        self.context_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
+        #self.context_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
+        self.context_vectors_glove=tf.placeholder(dtype=tf.float32,shape=[None, self.FLAGS.context_len,self.FLAGS.embedding_size])
         self.context_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
-        self.qn_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
-        self.qn_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
+        #self.qn_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
+        self.question_vectors_glove = tf.placeholder(dtype=tf.float32,shape=[None, self.FLAGS.question_len, self.FLAGS.embedding_size])
+        self.question_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
         self.ans_span = tf.placeholder(tf.int32, shape=[None, 2])
 
         # Add a placeholder to feed in the keep probability (for dropout).
@@ -113,7 +119,7 @@ class QAModel(object):
             # Get the word embeddings for the context and question,
             # using the placeholders self.context_ids and self.qn_ids
             self.context_embs = embedding_ops.embedding_lookup(embedding_matrix, self.context_ids) # shape (batch_size, context_len, embedding_size)
-            self.qn_embs = embedding_ops.embedding_lookup(embedding_matrix, self.qn_ids) # shape (batch_size, question_len, embedding_size)
+            self.question_embs = embedding_ops.embedding_lookup(embedding_matrix, self.qn_ids) # shape (batch_size, question_len, embedding_size)
 
 
     def build_graph(self):
@@ -131,12 +137,12 @@ class QAModel(object):
         # Note: here the RNNEncoder is shared (i.e. the weights are the same)
         # between the context and the question.
         encoder = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
-        context_hiddens = encoder.build_graph(self.context_embs, self.context_mask) # (batch_size, context_len, hidden_size*2)
-        question_hiddens = encoder.build_graph(self.qn_embs, self.qn_mask) # (batch_size, question_len, hidden_size*2)
+        context_hiddens = encoder.build_graph(self.context_vectors_glove, self.context_mask) # (batch_size, context_len, hidden_size*2)
+        question_hiddens = encoder.build_graph(self.question_vectors_glove, self.question_mask) # (batch_size, question_len, hidden_size*2)
 
         # Use context hidden states to attend to question hidden states
         attn_layer = BasicAttn(self.keep_prob, self.FLAGS.hidden_size*2, self.FLAGS.hidden_size*2)
-        _, attn_output = attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens) # attn_output is shape (batch_size, context_len, hidden_size*2)
+        _, attn_output = attn_layer.build_graph(question_hiddens, self.question_mask, context_hiddens) # attn_output is shape (batch_size, context_len, hidden_size*2)
 
         # Concat attn_output to context_hiddens to get blended_reps
         blended_reps = tf.concat([context_hiddens, attn_output], axis=2) # (batch_size, context_len, hidden_size*4)
@@ -212,10 +218,12 @@ class QAModel(object):
         """
         # Match up our input data with the placeholders
         input_feed = {}
-        input_feed[self.context_ids] = batch.context_ids
+        #input_feed[self.context_ids] = batch.context_ids
+        input_feed[self.context_vectors_glove]=batch.context_words_glove
         input_feed[self.context_mask] = batch.context_mask
-        input_feed[self.qn_ids] = batch.qn_ids
-        input_feed[self.qn_mask] = batch.qn_mask
+        #input_feed[self.qn_ids] = batch.qn_ids
+        input_feed[self.question_vectors_glove] = batch.question_words_glove
+        input_feed[self.question_mask] = batch.question_mask
         input_feed[self.ans_span] = batch.ans_span
         input_feed[self.keep_prob] = 1.0 - self.FLAGS.dropout # apply dropout
 
@@ -244,10 +252,12 @@ class QAModel(object):
         """
 
         input_feed = {}
-        input_feed[self.context_ids] = batch.context_ids
+        # input_feed[self.context_ids] = batch.context_ids
+        input_feed[self.context_vectors_glove] = batch.context_words_glove
         input_feed[self.context_mask] = batch.context_mask
-        input_feed[self.qn_ids] = batch.qn_ids
-        input_feed[self.qn_mask] = batch.qn_mask
+        # input_feed[self.qn_ids] = batch.qn_ids
+        input_feed[self.question_vectors_glove] = batch.question_words_glove
+        input_feed[self.question_mask] = batch.question_mask
         input_feed[self.ans_span] = batch.ans_span
         # note you don't supply keep_prob here, so it will default to 1 i.e. no dropout
 
@@ -270,10 +280,12 @@ class QAModel(object):
           probdist_start and probdist_end: both shape (batch_size, context_len)
         """
         input_feed = {}
-        input_feed[self.context_ids] = batch.context_ids
+        # input_feed[self.context_ids] = batch.context_ids
+        input_feed[self.context_vectors_glove] = batch.context_words_glove
         input_feed[self.context_mask] = batch.context_mask
-        input_feed[self.qn_ids] = batch.qn_ids
-        input_feed[self.qn_mask] = batch.qn_mask
+        # input_feed[self.qn_ids] = batch.qn_ids
+        input_feed[self.question_vectors_glove] = batch.question_words_glove
+        input_feed[self.question_mask] = batch.question_mask
         # note you don't supply keep_prob here, so it will default to 1 i.e. no dropout
 
         output_feed = [self.probdist_start, self.probdist_end]
@@ -323,8 +335,8 @@ class QAModel(object):
         # which are longer than our context_len or question_len.
         # We need to do this because if, for example, the true answer is cut
         # off the context, then the loss function is undefined.
-        for batch in get_batch_generator(self.word2id, dev_context_path, dev_qn_path, dev_ans_path, self.FLAGS.batch_size, context_len=self.FLAGS.context_len, question_len=self.FLAGS.question_len, discard_long=True):
-
+        #for batch in get_batch_generator(self.word2id, dev_context_path, dev_qn_path, dev_ans_path, self.FLAGS.batch_size, context_len=self.FLAGS.context_len, question_len=self.FLAGS.question_len, discard_long=True):
+        for batch in self.dataObject.generate_one_dev_epoch(discard_long=True):
             # Get loss for this batch
             loss = self.get_loss(session, batch)
             curr_batch_size = batch.batch_size
@@ -378,41 +390,80 @@ class QAModel(object):
 
         # Note here we select discard_long=False because we want to sample from the entire dataset
         # That means we're truncating, rather than discarding, examples with too-long context or questions
-        for batch in get_batch_generator(self.word2id, context_path, qn_path, ans_path, self.FLAGS.batch_size, context_len=self.FLAGS.context_len, question_len=self.FLAGS.question_len, discard_long=False):
+        #for batch in get_batch_generator(self.word2id, context_path, qn_path, ans_path, self.FLAGS.batch_size, context_len=self.FLAGS.context_len, question_len=self.FLAGS.question_len, discard_long=False):
+        if session=='dev':
+            for batch in self.dataObject.generate_one_dev_epoch(discard_long=False):
+                pred_start_pos, pred_end_pos = self.get_start_end_pos(session, batch)
 
-            pred_start_pos, pred_end_pos = self.get_start_end_pos(session, batch)
+                # Convert the start and end positions to lists length batch_size
+                pred_start_pos = pred_start_pos.tolist() # list length batch_size
+                pred_end_pos = pred_end_pos.tolist() # list length batch_size
 
-            # Convert the start and end positions to lists length batch_size
-            pred_start_pos = pred_start_pos.tolist() # list length batch_size
-            pred_end_pos = pred_end_pos.tolist() # list length batch_size
+                for ex_idx, (pred_ans_start, pred_ans_end, true_ans_tokens) in enumerate(zip(pred_start_pos, pred_end_pos, batch.ans_tokens)):
+                    example_num += 1
 
-            for ex_idx, (pred_ans_start, pred_ans_end, true_ans_tokens) in enumerate(zip(pred_start_pos, pred_end_pos, batch.ans_tokens)):
-                example_num += 1
+                    # Get the predicted answer
+                    # Important: batch.context_tokens contains the original words (no UNKs)
+                    # You need to use the original no-UNK version when measuring F1/EM
+                    pred_ans_tokens = batch.context_tokens[ex_idx][pred_ans_start : pred_ans_end + 1]
+                    pred_answer = " ".join(pred_ans_tokens)
 
-                # Get the predicted answer
-                # Important: batch.context_tokens contains the original words (no UNKs)
-                # You need to use the original no-UNK version when measuring F1/EM
-                pred_ans_tokens = batch.context_tokens[ex_idx][pred_ans_start : pred_ans_end + 1]
-                pred_answer = " ".join(pred_ans_tokens)
+                    # Get true answer (no UNKs)
+                    true_answer = " ".join(true_ans_tokens)
 
-                # Get true answer (no UNKs)
-                true_answer = " ".join(true_ans_tokens)
+                    # Calc F1/EM
+                    f1 = f1_score(pred_answer, true_answer)
+                    em = exact_match_score(pred_answer, true_answer)
+                    f1_total += f1
+                    em_total += em
 
-                # Calc F1/EM
-                f1 = f1_score(pred_answer, true_answer)
-                em = exact_match_score(pred_answer, true_answer)
-                f1_total += f1
-                em_total += em
+                    # Optionally pretty-print
+                    if print_to_screen:
+                        print_example(self.word2id, batch.context_tokens[ex_idx], batch.qn_tokens[ex_idx], batch.ans_span[ex_idx, 0], batch.ans_span[ex_idx, 1], pred_ans_start, pred_ans_end, true_answer, pred_answer, f1, em)
 
-                # Optionally pretty-print
-                if print_to_screen:
-                    print_example(self.word2id, batch.context_tokens[ex_idx], batch.qn_tokens[ex_idx], batch.ans_span[ex_idx, 0], batch.ans_span[ex_idx, 1], pred_ans_start, pred_ans_end, true_answer, pred_answer, f1, em)
+                    if num_samples != 0 and example_num >= num_samples:
+                        break
 
                 if num_samples != 0 and example_num >= num_samples:
                     break
+        else:
+            for batch in self.dataObject.generate_one_training_epoch(discard_long=False):
+                pred_start_pos, pred_end_pos = self.get_start_end_pos(session, batch)
 
-            if num_samples != 0 and example_num >= num_samples:
-                break
+                # Convert the start and end positions to lists length batch_size
+                pred_start_pos = pred_start_pos.tolist()  # list length batch_size
+                pred_end_pos = pred_end_pos.tolist()  # list length batch_size
+
+                for ex_idx, (pred_ans_start, pred_ans_end, true_ans_tokens) in enumerate(
+                        zip(pred_start_pos, pred_end_pos, batch.ans_tokens)):
+                    example_num += 1
+
+                    # Get the predicted answer
+                    # Important: batch.context_tokens contains the original words (no UNKs)
+                    # You need to use the original no-UNK version when measuring F1/EM
+                    pred_ans_tokens = batch.context_tokens[ex_idx][pred_ans_start: pred_ans_end + 1]
+                    pred_answer = " ".join(pred_ans_tokens)
+
+                    # Get true answer (no UNKs)
+                    true_answer = " ".join(true_ans_tokens)
+
+                    # Calc F1/EM
+                    f1 = f1_score(pred_answer, true_answer)
+                    em = exact_match_score(pred_answer, true_answer)
+                    f1_total += f1
+                    em_total += em
+
+                    # Optionally pretty-print
+                    if print_to_screen:
+                        print_example(self.word2id, batch.context_tokens[ex_idx], batch.qn_tokens[ex_idx],
+                                      batch.ans_span[ex_idx, 0], batch.ans_span[ex_idx, 1], pred_ans_start,
+                                      pred_ans_end, true_answer, pred_answer, f1, em)
+
+                    if num_samples != 0 and example_num >= num_samples:
+                        break
+
+                if num_samples != 0 and example_num >= num_samples:
+                    break
 
         f1_total /= example_num
         em_total /= example_num
@@ -461,8 +512,8 @@ class QAModel(object):
             epoch_tic = time.time()
 
             # Loop over batches
-            for batch in get_batch_generator(self.word2id, train_context_path, train_qn_path, train_ans_path, self.FLAGS.batch_size, context_len=self.FLAGS.context_len, question_len=self.FLAGS.question_len, discard_long=True):
-
+            #for batch in get_batch_generator(self.word2id, train_context_path, train_qn_path, train_ans_path, self.FLAGS.batch_size, context_len=self.FLAGS.context_len, question_len=self.FLAGS.question_len, discard_long=True):
+            for batch in self.dataObject.generate_one_training_epoch(discard_long=True):
                 # Run training iteration
                 iter_tic = time.time()
                 loss, global_step, param_norm, grad_norm = self.run_train_iter(session, batch, summary_writer)

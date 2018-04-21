@@ -26,7 +26,7 @@ from six.moves import xrange
 from nltk.tokenize.moses import MosesDetokenizer
 
 from preprocessing.squad_preprocess import data_from_json, tokenize
-from vocab import UNK_ID, PAD_ID
+from word_and_character_vectors import UNK_ID, PAD_ID
 from data_batcher import padded, Batch
 
 

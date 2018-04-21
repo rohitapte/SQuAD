@@ -26,7 +26,8 @@ import logging
 import tensorflow as tf
 
 from qa_model import QAModel
-from vocab import get_glove
+#from vocab import get_glove
+from word_and_character_vectors import get_glove,get_char
 from official_eval_helper import get_json_data, generate_answers
 
 
@@ -49,19 +50,23 @@ tf.app.flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm
 tf.app.flags.DEFINE_float("dropout", 0.15, "Fraction of units randomly dropped on non-recurrent connections.")
 tf.app.flags.DEFINE_integer("batch_size", 100, "Batch size to use")
 tf.app.flags.DEFINE_integer("hidden_size", 200, "Size of the hidden states")
-tf.app.flags.DEFINE_integer("context_len", 600, "The maximum context length of your model")
+tf.app.flags.DEFINE_integer("context_len", 300, "The maximum context length of your model")
 tf.app.flags.DEFINE_integer("question_len", 30, "The maximum question length of your model")
-tf.app.flags.DEFINE_integer("embedding_size", 100, "Size of the pretrained word vectors. This needs to be one of the available GloVe dimensions: 50/100/200/300")
+tf.app.flags.DEFINE_integer("context_word_len", 37, "The maximum context length of your model")
+tf.app.flags.DEFINE_integer("question_word_len", 30, "The maximum question length of your model")
+tf.app.flags.DEFINE_integer("embedding_size", 300, "Size of the pretrained word vectors. This needs to be one of the available GloVe dimensions: 50/100/200/300")
+
 
 # How often to print, save, eval
-tf.app.flags.DEFINE_integer("print_every", 1, "How many iterations to do per print.")
-tf.app.flags.DEFINE_integer("save_every", 500, "How many iterations to do per save.")
-tf.app.flags.DEFINE_integer("eval_every", 500, "How many iterations to do per calculating loss/f1/em on dev set. Warning: this is fairly time-consuming so don't do it too often.")
+tf.app.flags.DEFINE_integer("print_every", 10, "How many iterations to do per print.")
+tf.app.flags.DEFINE_integer("save_every", 1000, "How many iterations to do per save.")
+tf.app.flags.DEFINE_integer("eval_every", 1000, "How many iterations to do per calculating loss/f1/em on dev set. Warning: this is fairly time-consuming so don't do it too often.")
 tf.app.flags.DEFINE_integer("keep", 1, "How many checkpoints to keep. 0 indicates keep all (you shouldn't need to do keep all though - it's very storage intensive).")
 
 # Reading and saving data
 tf.app.flags.DEFINE_string("train_dir", "", "Training directory to save the model parameters and other info. Defaults to experiments/{experiment_name}")
-tf.app.flags.DEFINE_string("glove_path", "", "Path to glove .txt file. Defaults to data/glove.6B.{embedding_size}d.txt")
+#tf.app.flags.DEFINE_string("glove_path", "", "Path to glove .txt file. Defaults to data/glove.6B.{embedding_size}d.txt")
+tf.app.flags.DEFINE_string("embedding_data_path", "c:\\Users\\tihor\\Documents\\ml_data_files\\", "Path to embedding data files.")
 tf.app.flags.DEFINE_string("data_dir", DEFAULT_DATA_DIR, "Where to find preprocessed SQuAD data for training. Defaults to data/")
 tf.app.flags.DEFINE_string("ckpt_load_dir", "", "For official_eval mode, which directory to load the checkpoint fron. You need to specify this for official_eval mode.")
 tf.app.flags.DEFINE_string("json_in_path", "", "For official_eval mode, path to JSON input file. You need to specify this for official_eval_mode.")
@@ -119,10 +124,13 @@ def main(unused_argv):
     bestmodel_dir = os.path.join(FLAGS.train_dir, "best_checkpoint")
 
     # Define path for glove vecs
-    FLAGS.glove_path = FLAGS.glove_path or os.path.join(DEFAULT_DATA_DIR, "glove.6B.{}d.txt".format(FLAGS.embedding_size))
+    #FLAGS.glove_path = FLAGS.glove_path or os.path.join(DEFAULT_DATA_DIR, "glove.6B.{}d.txt".format(FLAGS.embedding_size))
 
     # Load embedding matrix and vocab mappings
-    emb_matrix, word2id, id2word = get_glove(FLAGS.glove_path, FLAGS.embedding_size)
+    #emb_matrix, word2id, id2word = get_glove(FLAGS.glove_path, FLAGS.embedding_size)
+    #print(FLAGS.embedding_data_path)
+    emb_matrix, word2id, id2word = get_glove(FLAGS.embedding_data_path)
+    char_embed_matrix, char2id, id2char = get_char(FLAGS.embedding_data_path, 128, 5)
 
     # Get filepaths to train/dev datafiles for tokenized queries, contexts and answers
     train_context_path = os.path.join(FLAGS.data_dir, "train.context")
@@ -133,7 +141,7 @@ def main(unused_argv):
     dev_ans_path = os.path.join(FLAGS.data_dir, "dev.span")
 
     # Initialize model
-    qa_model = QAModel(FLAGS, id2word, word2id, emb_matrix)
+    qa_model = QAModel(FLAGS, id2word, word2id, emb_matrix,id2char,char2id,char_embed_matrix)
 
     # Some GPU settings
     config=tf.ConfigProto()

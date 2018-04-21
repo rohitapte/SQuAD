@@ -50,11 +50,6 @@ class QAModel(object):
         """
         print ("Initializing the QAModel...")
         self.FLAGS = FLAGS
-        self.id2word = id2word
-        self.word2id = word2id
-        #self.id2char=id2char
-        #self.char2id=char2id
-        #self.char_embed_matrix=char_embed_matrix
         self.dataObject=SQuadDataObject(word2id,id2word,emb_matrix,None,None,None,None,None,None,char2id,id2char,char_embed_matrix,self.FLAGS.data_dir,self.FLAGS.batch_size,self.FLAGS.context_len,self.FLAGS.question_len,self.FLAGS.context_word_len,self.FLAGS.question_word_len)
 
         # Add all parts of the graph

@@ -26,7 +26,7 @@ def padded(token_batch, batch_pad=0):
     return retval
 
 class Batch(object):
-    def __init__(self,context_tokens, context_mask, context_words_glove, context_words_char, question_tokens,question_mask, question_words_glove, question_words_char, ans_span,uuids=None):
+    def __init__(self,context_tokens, context_mask, context_words_glove, context_words_char, question_tokens,question_mask, question_words_glove, question_words_char, ans_span,ans_tokens,uuids=None):
         self.context_tokens=context_tokens
         self.context_mask=context_mask
         self.context_words_glove=context_words_glove
@@ -36,6 +36,7 @@ class Batch(object):
         self.question_words_glove=question_words_glove
         self.question_words_char=question_words_char
         self.ans_span=ans_span
+        self.ans_tokens=ans_tokens
         self.uuids=uuids
         self.batch_size = len(self.context_mask)
 
@@ -78,20 +79,20 @@ class SQuadDataObject(object):
         question_tokens = split_by_whitespace(question)
         if len(context_tokens) > self.context_length:
             if discard_long:
-                return None, None, None, None, None, None,None, None,None
+                return None, None, None, None, None, None,None, None,None,None
             else:
                 context_tokens = context_tokens[:self.context_length]
         if len(question_tokens) > self.question_length:
             if discard_long:
-                return None, None, None, None, None, None,None, None,None
+                return None, None, None, None, None, None,None, None,None,None
             else:
                 question_tokens = question_tokens[:self.question_length]
         ans_line = [int(s) for s in ans.split()]
         assert len(ans_line) == 2
         if ans_line[1] < ans_line[0]:
             print("Found an ill-formed gold span: start=%i end=%i" % (ans_line[0], ans_line[1]))
-            return None,None,None,None,None,None,None, None,None
-
+            return None,None,None,None,None,None,None, None,None,None
+        ans_tokens = context_tokens[ans_line[0]: ans_line[1] + 1]
         glove_ids_context=pad_words(tokens_to_word_ids(context_tokens,self.glove_word2id),self.context_length)
         glove_vectors_context=convert_ids_to_word_vectors(glove_ids_context,self.glove_embed_matrix)
         char_ids_context=pad_characters(tokens_to_char_ids(context_tokens,self.char2id),self.context_length,self.context_word_length)
@@ -101,7 +102,7 @@ class SQuadDataObject(object):
         glove_vectors_question=convert_ids_to_word_vectors(glove_ids_question,self.glove_embed_matrix)
         char_ids_question = pad_characters(tokens_to_char_ids(question_tokens, self.char2id), self.question_length,self.question_word_length)
         char_vectors_question = convert_ids_to_char_vectors(char_ids_question, self.char_embed_matrix)
-        return context_tokens,glove_ids_context,glove_vectors_context,char_vectors_context,question_tokens,glove_ids_question,glove_vectors_question,char_vectors_question,ans_line
+        return context_tokens,glove_ids_context,glove_vectors_context,char_vectors_context,question_tokens,glove_ids_question,glove_vectors_question,char_vectors_question,ans_line,ans_tokens
 
     def generate_one_training_epoch(self,discard_long=False):
         num_batches=int(len(self.train_data))//self.batch_size
@@ -118,9 +119,10 @@ class SQuadDataObject(object):
             question_words_glove=[]
             question_words_char=[]
             ans_span=[]
+            ans_tokens=[]
 
             for (context,question,ans) in self.train_data[i*self.batch_size:(i+1)*self.batch_size]:
-                context_token, glove_ids_context, glove_vectors_context, char_vectors_context, question_token, glove_ids_question, glove_vectors_question, char_vectors_question, ans_line=self.process_data(context,question,ans,discard_long)
+                context_token, glove_ids_context, glove_vectors_context, char_vectors_context, question_token, glove_ids_question, glove_vectors_question, char_vectors_question, ans_line,ans_token=self.process_data(context,question,ans,discard_long)
                 if glove_ids_context is not None:
                     context_words_for_mask.append(glove_ids_context)
                     context_words_glove.append(glove_vectors_context)
@@ -129,6 +131,7 @@ class SQuadDataObject(object):
                     question_words_glove.append(glove_vectors_question)
                     question_words_char.append(char_vectors_question)
                     ans_span.append(ans_line)
+                    ans_tokens.append(ans_token)
             context_tokens.append(context_token)
             context_words_for_mask=np.array(context_words_for_mask)
             context_words_glove=np.array(context_words_glove)
@@ -138,9 +141,10 @@ class SQuadDataObject(object):
             question_words_glove=np.array(question_words_glove)
             question_words_char=np.array(question_words_char)
             ans_span=np.array(ans_span)
+            ans_tokens=np.array(ans_tokens)
             context_mask=(context_words_for_mask!=PAD_ID).astype(np.int32)
             question_mask=(question_words_for_mask!=PAD_ID).astype(np.int32)
-            batch = Batch(context_tokens,context_mask, context_words_glove, context_words_char,question_tokens, question_mask, question_words_glove,question_words_char, ans_span)
+            batch = Batch(context_tokens,context_mask, context_words_glove, context_words_char,question_tokens, question_mask, question_words_glove,question_words_char, ans_span,ans_tokens)
             yield batch
 
     def generate_one_dev_epoch(self,discard_long=False):
@@ -158,9 +162,10 @@ class SQuadDataObject(object):
             question_words_glove = []
             question_words_char = []
             ans_span = []
+            ans_tokens=[]
 
             for (context,question,ans) in self.dev_data[i*self.batch_size:(i+1)*self.batch_size]:
-                context_token, glove_ids_context, glove_vectors_context, char_vectors_context, question_token, glove_ids_question, glove_vectors_question, char_vectors_question, ans_line=self.process_data(context,question,ans,discard_long)
+                context_token, glove_ids_context, glove_vectors_context, char_vectors_context, question_token, glove_ids_question, glove_vectors_question, char_vectors_question, ans_line,ans_token=self.process_data(context,question,ans,discard_long)
                 if glove_ids_context is not None:
                     context_words_for_mask.append(glove_ids_context)
                     context_words_glove.append(glove_vectors_context)
@@ -169,6 +174,7 @@ class SQuadDataObject(object):
                     question_words_glove.append(glove_vectors_question)
                     question_words_char.append(char_vectors_question)
                     ans_span.append(ans_line)
+                    ans_tokens.append(ans_token)
             context_tokens.append(context_token)
             context_words_for_mask = np.array(context_words_for_mask)
             context_words_glove = np.array(context_words_glove)
@@ -178,9 +184,10 @@ class SQuadDataObject(object):
             question_words_glove = np.array(question_words_glove)
             question_words_char = np.array(question_words_char)
             ans_span = np.array(ans_span)
+            ans_tokens=np.array(ans_tokens)
             context_mask = (context_words_for_mask != PAD_ID).astype(np.int32)
             question_mask = (question_words_for_mask != PAD_ID).astype(np.int32)
-            batch = Batch(context_tokens, context_mask, context_words_glove, context_words_char, question_tokens,question_mask, question_words_glove, question_words_char, ans_span)
+            batch = Batch(context_tokens, context_mask, context_words_glove, context_words_char, question_tokens,question_mask, question_words_glove, question_words_char, ans_span,ans_tokens)
             yield batch
 
 

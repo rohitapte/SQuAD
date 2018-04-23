@@ -50,7 +50,7 @@ tf.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means
 tf.app.flags.DEFINE_float("learning_rate", 0.001, "Learning rate.")
 tf.app.flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
 tf.app.flags.DEFINE_float("dropout", 0.15, "Fraction of units randomly dropped on non-recurrent connections.")
-tf.app.flags.DEFINE_integer("batch_size", 500, "Batch size to use")
+tf.app.flags.DEFINE_integer("batch_size", 100, "Batch size to use")
 tf.app.flags.DEFINE_integer("hidden_size", 200, "Size of the hidden states")
 tf.app.flags.DEFINE_integer("context_len", 300, "The maximum context length of your model")
 tf.app.flags.DEFINE_integer("question_len", 30, "The maximum question length of your model")
@@ -60,15 +60,18 @@ tf.app.flags.DEFINE_integer("embedding_size", 300, "Size of the pretrained word 
 
 
 # How often to print, save, eval
-tf.app.flags.DEFINE_integer("print_every", 10, "How many iterations to do per print.")
-tf.app.flags.DEFINE_integer("save_every", 1000, "How many iterations to do per save.")
-tf.app.flags.DEFINE_integer("eval_every", 1000, "How many iterations to do per calculating loss/f1/em on dev set. Warning: this is fairly time-consuming so don't do it too often.")
+tf.app.flags.DEFINE_integer("print_every", 1, "How many iterations to do per print.")
+tf.app.flags.DEFINE_integer("save_every", 500, "How many iterations to do per save.")
+tf.app.flags.DEFINE_integer("eval_every", 500, "How many iterations to do per calculating loss/f1/em on dev set. Warning: this is fairly time-consuming so don't do it too often.")
 tf.app.flags.DEFINE_integer("keep", 1, "How many checkpoints to keep. 0 indicates keep all (you shouldn't need to do keep all though - it's very storage intensive).")
 
 # Reading and saving data
 tf.app.flags.DEFINE_string("train_dir", "", "Training directory to save the model parameters and other info. Defaults to experiments/{experiment_name}")
 #tf.app.flags.DEFINE_string("glove_path", "", "Path to glove .txt file. Defaults to data/glove.6B.{embedding_size}d.txt")
-tf.app.flags.DEFINE_string("embedding_data_path", "../../ml_data_files", "Path to embedding data files.")
+if sys.platform=='win32':
+    tf.app.flags.DEFINE_string("embedding_data_path", "c:\\Users\\tihor\\Documents\\ml_data_files", "Path to embedding data files.")
+else:
+    tf.app.flags.DEFINE_string("embedding_data_path", "/home/rohitapte/Documents/ml_data_files","Path to embedding data files.")
 tf.app.flags.DEFINE_string("data_dir", DEFAULT_DATA_DIR, "Where to find preprocessed SQuAD data for training. Defaults to data/")
 tf.app.flags.DEFINE_string("ckpt_load_dir", "", "For official_eval mode, which directory to load the checkpoint fron. You need to specify this for official_eval mode.")
 tf.app.flags.DEFINE_string("json_in_path", "", "For official_eval mode, path to JSON input file. You need to specify this for official_eval_mode.")

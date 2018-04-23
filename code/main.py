@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 import sys
 sys.path.append('../../python_libraries')
-
+sys.path.append('../python_libraries')
 import os
 import io
 import json

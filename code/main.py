@@ -114,9 +114,6 @@ def main(unused_argv):
     #if sys.version_info[0] != 2:
     #    raise Exception("ERROR: You must use Python 2 but you are running Python %i" % sys.version_info[0])
 
-    # Print out Tensorflow version
-    print ("This code was developed and tested on TensorFlow 1.4.1. Your TensorFlow version: %s" % tf.__version__)
-
     # Define train_dir
     if not FLAGS.experiment_name and not FLAGS.train_dir and FLAGS.mode != "official_eval":
         raise Exception("You need to specify either --experiment_name or --train_dir")

@@ -38,7 +38,7 @@ logging.basicConfig(level=logging.INFO)
 class QAModel(object):
     """Top-level Question Answering module"""
 
-    def __init__(self, FLAGS, id2word, word2id, emb_matrix,id2char,char2id,char_embed_matrix):
+    def __init__(self, FLAGS, glove_id2word, glove_word2id, glove_emb_matrix,id2char,char2id,char_embed_matrix):
         """
         Initializes the QA model.
 
@@ -49,8 +49,10 @@ class QAModel(object):
           emb_matrix: numpy array shape (400002, embedding_size) containing pre-traing GloVe embeddings
         """
         print ("Initializing the QAModel...")
+        self.glove_word2id=glove_word2id
+        self.glove_id2word=glove_id2word
         self.FLAGS = FLAGS
-        self.dataObject=SQuadDataObject(word2id,id2word,emb_matrix,None,None,None,None,None,None,char2id,id2char,char_embed_matrix,self.FLAGS.data_dir,self.FLAGS.batch_size,self.FLAGS.context_len,self.FLAGS.question_len,self.FLAGS.context_word_len,self.FLAGS.question_word_len)
+        self.dataObject=SQuadDataObject(glove_word2id,glove_id2word,glove_emb_matrix,None,None,None,None,None,None,char2id,id2char,char_embed_matrix,self.FLAGS.data_dir,self.FLAGS.batch_size,self.FLAGS.context_len,self.FLAGS.question_len,self.FLAGS.context_word_len,self.FLAGS.question_word_len)
 
         # Add all parts of the graph
         with tf.variable_scope("QAModel", initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, uniform=True)):
@@ -414,7 +416,7 @@ class QAModel(object):
 
                     # Optionally pretty-print
                     if print_to_screen:
-                        print_example(self.word2id, batch.context_tokens[ex_idx], batch.qn_tokens[ex_idx], batch.ans_span[ex_idx, 0], batch.ans_span[ex_idx, 1], pred_ans_start, pred_ans_end, true_answer, pred_answer, f1, em)
+                        print_example(self.glove_word2id, batch.context_tokens[ex_idx], batch.question_tokens[ex_idx], batch.ans_span[ex_idx, 0], batch.ans_span[ex_idx, 1], pred_ans_start, pred_ans_end, true_answer, pred_answer, f1, em)
 
                     if num_samples != 0 and example_num >= num_samples:
                         break
@@ -450,7 +452,7 @@ class QAModel(object):
 
                     # Optionally pretty-print
                     if print_to_screen:
-                        print_example(self.word2id, batch.context_tokens[ex_idx], batch.qn_tokens[ex_idx],
+                        print_example(self.glove_word2id, batch.context_tokens[ex_idx], batch.question_tokens[ex_idx],
                                       batch.ans_span[ex_idx, 0], batch.ans_span[ex_idx, 1], pred_ans_start,
                                       pred_ans_end, true_answer, pred_answer, f1, em)
 

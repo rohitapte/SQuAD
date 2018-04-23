@@ -95,13 +95,17 @@ class SQuadDataObject(object):
         ans_tokens = context_tokens[ans_line[0]: ans_line[1] + 1]
         glove_ids_context=pad_words(tokens_to_word_ids(context_tokens,self.glove_word2id),self.context_length)
         glove_vectors_context=convert_ids_to_word_vectors(glove_ids_context,self.glove_embed_matrix)
-        char_ids_context=pad_characters(tokens_to_char_ids(context_tokens,self.char2id),self.context_length,self.context_word_length)
-        char_vectors_context=convert_ids_to_char_vectors(char_ids_context,self.char_embed_matrix)
+        #char_ids_context=pad_characters(tokens_to_char_ids(context_tokens,self.char2id),self.context_length,self.context_word_length)
+        #char_vectors_context=convert_ids_to_char_vectors(char_ids_context,self.char_embed_matrix)
+        char_ids_context=None
+        char_vectors_context=None
 
         glove_ids_question=pad_words(tokens_to_word_ids(question_tokens,self.glove_word2id),self.question_length)
         glove_vectors_question=convert_ids_to_word_vectors(glove_ids_question,self.glove_embed_matrix)
-        char_ids_question = pad_characters(tokens_to_char_ids(question_tokens, self.char2id), self.question_length,self.question_word_length)
-        char_vectors_question = convert_ids_to_char_vectors(char_ids_question, self.char_embed_matrix)
+        #char_ids_question = pad_characters(tokens_to_char_ids(question_tokens, self.char2id), self.question_length,self.question_word_length)
+        #char_vectors_question = convert_ids_to_char_vectors(char_ids_question, self.char_embed_matrix)
+        char_ids_question=None
+        char_vectors_question=None
         return context_tokens,glove_ids_context,glove_vectors_context,char_vectors_context,question_tokens,glove_ids_question,glove_vectors_question,char_vectors_question,ans_line,ans_tokens
 
     def generate_one_training_epoch(self,discard_long=False):
@@ -126,21 +130,21 @@ class SQuadDataObject(object):
                 if glove_ids_context is not None:
                     context_words_for_mask.append(glove_ids_context)
                     context_words_glove.append(glove_vectors_context)
-                    context_words_char.append(char_vectors_context)
+                    #context_words_char.append(char_vectors_context)
                     question_words_for_mask.append(glove_ids_question)
                     question_words_glove.append(glove_vectors_question)
-                    question_words_char.append(char_vectors_question)
+                    #question_words_char.append(char_vectors_question)
                     ans_span.append(ans_line)
                     ans_tokens.append(ans_token)
                     context_tokens.append(context_token)
                     question_tokens.append(question_token)
             context_words_for_mask=np.array(context_words_for_mask)
             context_words_glove=np.array(context_words_glove)
-            context_words_char=np.array(context_words_char)
+            #context_words_char=np.array(context_words_char)
             context_tokens=np.array(context_tokens)
             question_words_for_mask=np.array(question_words_for_mask)
             question_words_glove=np.array(question_words_glove)
-            question_words_char=np.array(question_words_char)
+            #question_words_char=np.array(question_words_char)
             question_tokens=np.array(question_tokens)
             ans_span=np.array(ans_span)
             ans_tokens=np.array(ans_tokens)
@@ -171,21 +175,21 @@ class SQuadDataObject(object):
                 if glove_ids_context is not None:
                     context_words_for_mask.append(glove_ids_context)
                     context_words_glove.append(glove_vectors_context)
-                    context_words_char.append(char_vectors_context)
+                    #context_words_char.append(char_vectors_context)
                     question_words_for_mask.append(glove_ids_question)
                     question_words_glove.append(glove_vectors_question)
-                    question_words_char.append(char_vectors_question)
+                    #question_words_char.append(char_vectors_question)
                     ans_span.append(ans_line)
                     ans_tokens.append(ans_token)
                     context_tokens.append(context_token)
                     question_tokens.append(question_token)
             context_words_for_mask = np.array(context_words_for_mask)
             context_words_glove = np.array(context_words_glove)
-            context_words_char = np.array(context_words_char)
+            #context_words_char = np.array(context_words_char)
             context_tokens = np.array(context_tokens)
             question_words_for_mask = np.array(question_words_for_mask)
             question_words_glove = np.array(question_words_glove)
-            question_words_char = np.array(question_words_char)
+            #question_words_char = np.array(question_words_char)
             question_tokens = np.array(question_tokens)
             ans_span = np.array(ans_span)
             ans_tokens = np.array(ans_tokens)

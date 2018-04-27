@@ -1,10 +1,85 @@
-#from nlp_functions.word_and_character_vectors import PAD_ID,UNK_ID
-#from nlp_functions.sentence_operations import get_ids_and_vectors
-import os
+# Copyright 2018 Stanford University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""This file contains code to read tokenized data from file,
+truncate, pad and process it into batches ready for training"""
+
+from __future__ import absolute_import
+from __future__ import division
+
 import random
+import time
+import re
+
 import numpy as np
-from nlp_functions.word_and_character_vectors import PAD_ID,UNK_ID,get_glove,get_char
-from nlp_functions.sentence_operations import split_by_whitespace,tokens_to_word_ids,tokens_to_char_ids,pad_words,convert_ids_to_word_vectors,pad_characters,convert_ids_to_char_vectors
+from six.moves import xrange
+from nlp_functions.word_and_character_vectors import UNK_ID, PAD_ID
+
+class Batch(object):
+    """A class to hold the information needed for a training batch"""
+
+    def __init__(self,context_ids,context_mask,context_tokens,context_glove_vectors,qn_ids,qn_mask,qn_tokens,qn_glove_vectors,ans_span,ans_tokens,uuids=None):
+        """
+        Inputs:
+          {context/qn}_ids: Numpy arrays.
+            Shape (batch_size, {context_len/question_len}). Contains padding.
+          {context/qn}_mask: Numpy arrays, same shape as _ids.
+            Contains 1s where there is real data, 0s where there is padding.
+          {context/qn/ans}_tokens: Lists length batch_size, containing lists (unpadded) of tokens (strings)
+          ans_span: numpy array, shape (batch_size, 2)
+          uuid: a list (length batch_size) of strings.
+            Not needed for training. Used by official_eval mode.
+        """
+        self.context_ids = context_ids
+        self.context_mask = context_mask
+        self.context_tokens = context_tokens
+        self.context_glove_vectors=context_glove_vectors
+
+        self.qn_ids = qn_ids
+        self.qn_mask = qn_mask
+        self.qn_tokens = qn_tokens
+        self.qn_glove_vectors=qn_glove_vectors
+
+        self.ans_span = ans_span
+        self.ans_tokens = ans_tokens
+
+        self.uuids = uuids
+
+        self.batch_size = len(self.context_tokens)
+
+
+def split_by_whitespace(sentence):
+    words = []
+    for space_separated_fragment in sentence.strip().split():
+        words.extend(re.split(" ", space_separated_fragment))
+    return [w for w in words if w]
+
+
+def intstr_to_intlist(string):
+    """Given a string e.g. '311 9 1334 635 6192 56 639', returns as a list of integers"""
+    return [int(s) for s in string.split()]
+
+
+def sentence_to_token_ids(sentence, word2id):
+    """Turns an already-tokenized sentence string into word indices
+    e.g. "i do n't know" -> [9, 32, 16, 96]
+    Note any token that isn't in the word2id mapping gets mapped to the id for UNK
+    """
+    tokens = split_by_whitespace(sentence) # list of strings
+    ids = [word2id.get(w, UNK_ID) for w in tokens]
+    return tokens, ids
+
 
 def padded(token_batch, batch_pad=0):
     """
@@ -15,211 +90,148 @@ def padded(token_batch, batch_pad=0):
       List (length batch_size) of padded of lists of ints.
         All are same length - batch_pad if batch_pad!=0, otherwise the maximum length in token_batch
     """
-    if batch_pad==0:
-        maxlen=max([len(token) for token in token_batch])
+    if batch_pad == 0:
+        maxlen = max([len(token) for token in token_batch])
     else:
-        maxlen=batch_pad
-    retval=[]
+        maxlen = batch_pad
+    retval = []
     for token in token_batch:
-        newtoken=token+[PAD_ID]*(maxlen-len(token))
+        newtoken = token + [PAD_ID] * (maxlen - len(token))
         retval.append(newtoken)
     return retval
 
-class Batch(object):
-    def __init__(self,context_tokens, context_mask, context_words_glove, context_words_char, question_tokens,question_mask, question_words_glove, question_words_char, ans_span,ans_tokens,uuids=None):
-        self.context_tokens=context_tokens
-        self.context_mask=context_mask
-        self.context_words_glove=context_words_glove
-        self.context_words_char=context_words_char
-        self.question_tokens=question_tokens
-        self.question_mask=question_mask
-        self.question_words_glove=question_words_glove
-        self.question_words_char=question_words_char
-        self.ans_span=ans_span
-        self.ans_tokens=ans_tokens
-        self.uuids=uuids
-        self.batch_size = len(self.context_mask)
+def convert_ids_to_word_vectors(word_ids,emb_matrix_word):
+    retval=[]
+    for id in word_ids:
+        retval.append(emb_matrix_word[id].tolist())
+    return retval
 
-class SQuadDataObject(object):
-    def __init__(self,glove_word2id,glove_id2word,glove_embed_matrix,word2vec_word2id,word2vec_id2word,word2vec_embed_matrix,fasttext_word2id,fasttext_id2word,fasttext_embed_matrix,char2id,id2char,char_embed_matrix,data_path,batch_size,context_length,question_length,context_word_length,question_word_length):
-        self.glove_word2id=glove_word2id
-        self.glove_id2word=glove_id2word
-        self.glove_embed_matrix=glove_embed_matrix
-        self.word2vec_word2id=word2vec_word2id
-        self.word2vec_id2word=word2vec_id2word
-        self.word2vec_embed_matrix=word2vec_embed_matrix
-        self.fasttext_word2id=fasttext_word2id
-        self.fasttext_id2word=fasttext_id2word
-        self.fasttext_embed_matrix=fasttext_embed_matrix
-        self.char2id=char2id
-        self.id2char=id2char
-        self.char_embed_matrix=char_embed_matrix
-        self.train_data=[]
-        self.dev_data=[]
-        context_file,question_file,ans_file=open(os.path.join(data_path,'train.context'),'r',encoding='utf-8'),open(os.path.join(data_path,'train.question'),'r',encoding='utf-8'),open(os.path.join(data_path,'train.span'),'r',encoding='utf-8')
-        context_line,question_line,ans_line=context_file.readline(),question_file.readline(),ans_file.readline()
-        while context_line and question_line and ans_line:
-            self.train_data.append((context_line,question_line,ans_line))
-            context_line,question_line,ans_line=context_file.readline(),question_file.readline(),ans_file.readline()
-        context_file,question_file,ans_file=open(os.path.join(data_path,'dev.context'),'r',encoding='utf-8'),open(os.path.join(data_path,'dev.question'),'r',encoding='utf-8'),open(os.path.join(data_path,'dev.span'),'r',encoding='utf-8')
-        context_line,question_line,ans_line=context_file.readline(),question_file.readline(),ans_file.readline()
-        while context_line and question_line and ans_line:
-            self.dev_data.append((context_line,question_line,ans_line))
-            context_line,question_line,ans_line=context_file.readline(),question_file.readline(),ans_file.readline()
-        print("Size of (context, question, answer) triples in training set: ",len(self.train_data))
-        print("Size of (context, question, answer) triples in dev set: ", len(self.dev_data))
-        self.batch_size=batch_size
-        self.context_length=context_length
-        self.question_length=question_length
-        self.context_word_length=context_word_length
-        self.question_word_length=question_word_length
+def refill_batches(batches,word2id_glove,context_file,qn_file,ans_file, batch_size, context_len, question_len, discard_long):
+    """
+    Adds more batches into the "batches" list.
 
-    def process_data(self,context,question,ans,discard_long):
-        context_tokens = split_by_whitespace(context)
-        question_tokens = split_by_whitespace(question)
-        if len(context_tokens) > self.context_length:
+    Inputs:
+      batches: list to add batches to
+      word2id: dictionary mapping word (string) to word id (int)
+      context_file, qn_file, ans_file: paths to {train/dev}.{context/question/answer} data files
+      batch_size: int. how big to make the batches
+      context_len, question_len: max length of context and question respectively
+      discard_long: If True, discard any examples that are longer than context_len or question_len.
+        If False, truncate those exmaples instead.
+    """
+    print ("Refilling batches...")
+    tic = time.time()
+    examples = [] # list of (qn_ids, context_ids, ans_span, ans_tokens) triples
+    context_line, qn_line, ans_line = context_file.readline(), qn_file.readline(), ans_file.readline() # read the next line from each
+
+    while context_line and qn_line and ans_line: # while you haven't reached the end
+
+        # Convert tokens to word ids
+        context_tokens, context_ids = sentence_to_token_ids(context_line, word2id_glove)
+        qn_tokens, qn_ids = sentence_to_token_ids(qn_line, word2id_glove)
+        ans_span = intstr_to_intlist(ans_line)
+
+        # read the next line from each file
+        context_line, qn_line, ans_line = context_file.readline(), qn_file.readline(), ans_file.readline()
+
+        # get ans_tokens from ans_span
+        assert len(ans_span) == 2
+        if ans_span[1] < ans_span[0]:
+            print ("Found an ill-formed gold span: start=%i end=%i" % (ans_span[0], ans_span[1]))
+            continue
+        ans_tokens = context_tokens[ans_span[0] : ans_span[1]+1] # list of strings
+
+        # discard or truncate too-long questions
+        if len(qn_ids) > question_len:
             if discard_long:
-                return None, None, None, None, None, None,None, None,None,None
-            else:
-                context_tokens = context_tokens[:self.context_length]
-        if len(question_tokens) > self.question_length:
+                continue
+            else: # truncate
+                qn_ids = qn_ids[:question_len]
+
+        # discard or truncate too-long contexts
+        if len(context_ids) > context_len:
             if discard_long:
-                return None, None, None, None, None, None,None, None,None,None
-            else:
-                question_tokens = question_tokens[:self.question_length]
-        ans_line = [int(s) for s in ans.split()]
-        assert len(ans_line) == 2
-        if ans_line[1] < ans_line[0]:
-            print("Found an ill-formed gold span: start=%i end=%i" % (ans_line[0], ans_line[1]))
-            return None,None,None,None,None,None,None, None,None,None
-        ans_tokens = context_tokens[ans_line[0]: ans_line[1] + 1]
-        glove_ids_context=pad_words(tokens_to_word_ids(context_tokens,self.glove_word2id),self.context_length)
-        glove_vectors_context=convert_ids_to_word_vectors(glove_ids_context,self.glove_embed_matrix)
-        #char_ids_context=pad_characters(tokens_to_char_ids(context_tokens,self.char2id),self.context_length,self.context_word_length)
-        #char_vectors_context=convert_ids_to_char_vectors(char_ids_context,self.char_embed_matrix)
-        char_ids_context=None
-        char_vectors_context=None
+                continue
+            else: # truncate
+                context_ids = context_ids[:context_len]
 
-        glove_ids_question=pad_words(tokens_to_word_ids(question_tokens,self.glove_word2id),self.question_length)
-        glove_vectors_question=convert_ids_to_word_vectors(glove_ids_question,self.glove_embed_matrix)
-        #char_ids_question = pad_characters(tokens_to_char_ids(question_tokens, self.char2id), self.question_length,self.question_word_length)
-        #char_vectors_question = convert_ids_to_char_vectors(char_ids_question, self.char_embed_matrix)
-        char_ids_question=None
-        char_vectors_question=None
-        return context_tokens,glove_ids_context,glove_vectors_context,char_vectors_context,question_tokens,glove_ids_question,glove_vectors_question,char_vectors_question,ans_line,ans_tokens
+        # add to examples
+        examples.append((context_ids, context_tokens, qn_ids, qn_tokens, ans_span, ans_tokens))
 
-    def generate_one_training_epoch(self,discard_long=False):
-        num_batches=int(len(self.train_data))//self.batch_size
-        if self.batch_size*num_batches<len(self.train_data): num_batches+=1
-        random.shuffle(self.train_data)
+        # stop refilling if you have 160 batches
+        if len(examples) == batch_size * 160:
+            break
 
-        for i in range(num_batches):
-            context_tokens=[]
-            context_words_for_mask=[]
-            context_words_glove=[]
-            context_words_char=[]
-            question_tokens=[]
-            question_words_for_mask=[]
-            question_words_glove=[]
-            question_words_char=[]
-            ans_span=[]
-            ans_tokens=[]
+    # Once you've either got 160 batches or you've reached end of file:
 
-            for (context,question,ans) in self.train_data[i*self.batch_size:(i+1)*self.batch_size]:
-                context_token, glove_ids_context, glove_vectors_context, char_vectors_context, question_token, glove_ids_question, glove_vectors_question, char_vectors_question, ans_line,ans_token=self.process_data(context,question,ans,discard_long)
-                if glove_ids_context is not None:
-                    context_words_for_mask.append(glove_ids_context)
-                    context_words_glove.append(glove_vectors_context)
-                    #context_words_char.append(char_vectors_context)
-                    question_words_for_mask.append(glove_ids_question)
-                    question_words_glove.append(glove_vectors_question)
-                    #question_words_char.append(char_vectors_question)
-                    ans_span.append(ans_line)
-                    ans_tokens.append(ans_token)
-                    context_tokens.append(context_token)
-                    question_tokens.append(question_token)
-            context_words_for_mask=np.array(context_words_for_mask)
-            context_words_glove=np.array(context_words_glove)
-            #context_words_char=np.array(context_words_char)
-            context_tokens=np.array(context_tokens)
-            question_words_for_mask=np.array(question_words_for_mask)
-            question_words_glove=np.array(question_words_glove)
-            #question_words_char=np.array(question_words_char)
-            question_tokens=np.array(question_tokens)
-            ans_span=np.array(ans_span)
-            ans_tokens=np.array(ans_tokens)
-            context_mask=(context_words_for_mask!=PAD_ID).astype(np.int32)
-            question_mask=(question_words_for_mask!=PAD_ID).astype(np.int32)
-            batch = Batch(context_tokens,context_mask, context_words_glove, context_words_char,question_tokens, question_mask, question_words_glove,question_words_char, ans_span,ans_tokens)
-            yield batch
+    # Sort by question length
+    # Note: if you sort by context length, then you'll have batches which contain the same context many times (because each context appears several times, with different questions)
+    examples = sorted(examples, key=lambda e: len(e[2]))
 
-    def generate_one_dev_epoch(self,discard_long=False):
-        num_batches=int(len(self.dev_data))//self.batch_size
-        if self.batch_size*num_batches<len(self.dev_data): num_batches+=1
-        random.shuffle(self.dev_data)
+    # Make into batches and append to the list batches
+    for batch_start in xrange(0, len(examples), batch_size):
 
-        for i in range(num_batches):
-            context_tokens = []
-            context_words_for_mask = []
-            context_words_glove = []
-            context_words_char = []
-            question_tokens = []
-            question_words_for_mask = []
-            question_words_glove = []
-            question_words_char = []
-            ans_span = []
-            ans_tokens=[]
+        # Note: each of these is a list length batch_size of lists of ints (except on last iter when it might be less than batch_size)
+        context_ids_batch, context_tokens_batch, qn_ids_batch, qn_tokens_batch, ans_span_batch, ans_tokens_batch = zip(*examples[batch_start:batch_start+batch_size])
 
-            for (context,question,ans) in self.dev_data[i*self.batch_size:(i+1)*self.batch_size]:
-                context_token, glove_ids_context, glove_vectors_context, char_vectors_context, question_token, glove_ids_question, glove_vectors_question, char_vectors_question, ans_line,ans_token=self.process_data(context,question,ans,discard_long)
-                if glove_ids_context is not None:
-                    context_words_for_mask.append(glove_ids_context)
-                    context_words_glove.append(glove_vectors_context)
-                    #context_words_char.append(char_vectors_context)
-                    question_words_for_mask.append(glove_ids_question)
-                    question_words_glove.append(glove_vectors_question)
-                    #question_words_char.append(char_vectors_question)
-                    ans_span.append(ans_line)
-                    ans_tokens.append(ans_token)
-                    context_tokens.append(context_token)
-                    question_tokens.append(question_token)
-            context_words_for_mask = np.array(context_words_for_mask)
-            context_words_glove = np.array(context_words_glove)
-            #context_words_char = np.array(context_words_char)
-            context_tokens = np.array(context_tokens)
-            question_words_for_mask = np.array(question_words_for_mask)
-            question_words_glove = np.array(question_words_glove)
-            #question_words_char = np.array(question_words_char)
-            question_tokens = np.array(question_tokens)
-            ans_span = np.array(ans_span)
-            ans_tokens = np.array(ans_tokens)
-            context_mask = (context_words_for_mask != PAD_ID).astype(np.int32)
-            question_mask = (question_words_for_mask != PAD_ID).astype(np.int32)
-            batch = Batch(context_tokens, context_mask, context_words_glove, context_words_char, question_tokens,
-                          question_mask, question_words_glove, question_words_char, ans_span, ans_tokens)
-            yield batch
+        batches.append((context_ids_batch, context_tokens_batch, qn_ids_batch, qn_tokens_batch, ans_span_batch, ans_tokens_batch))
+
+    # shuffle the batches
+    random.shuffle(batches)
+
+    toc = time.time()
+    print ("Refilling batches took %.2f seconds" % (toc-tic))
+    return
 
 
-"""glove_embed_matrix,glove_word2id,glove_id2word=get_glove('../../ml_data_files/')
-word2vec_embed_matrix,word2vec_word2id,word2vec_id2word=None,None,None
-fasttext_embed_matrix,fasttext_word2id,fasttext_id2word=None,None,None
-char_embed_matrix,char2id,id2char=get_char('../../ml_data_files/',128,5)
+def get_batch_generator(word2id_glove,emb_matrix_glove, context_path, qn_path, ans_path, batch_size, context_len, question_len, discard_long):
+    """
+    This function returns a generator object that yields batches.
+    The last batch in the dataset will be a partial batch.
+    Read this to understand generators and the yield keyword in Python: https://stackoverflow.com/questions/231767/what-does-the-yield-keyword-do
 
-data_path='../data/'
-batch_size=500
-context_length=300
-question_length=30
-context_word_length=37
-question_word_length=30
-discard_long=False
-zz=SQuadDataObject(glove_word2id,glove_id2word,glove_embed_matrix,word2vec_word2id,word2vec_id2word,word2vec_embed_matrix,fasttext_word2id,fasttext_id2word,fasttext_embed_matrix,char2id,id2char,char_embed_matrix,data_path,batch_size,context_length,question_length,context_word_length,question_word_length)
-for batch in zz.generate_one_training_epoch(discard_long=True):
-    print(batch.context_mask.shape)
-    print(batch.context_words_glove.shape)
-    print(batch.context_words_char.shape)
-    print(batch.question_mask.shape)
-    print(batch.question_words_glove.shape)
-    print(batch.question_words_char.shape)
-    print(batch.ans_span.shape)
-    print("---------------------")
-"""
+    Inputs:
+      word2id: dictionary mapping word (string) to word id (int)
+      context_file, qn_file, ans_file: paths to {train/dev}.{context/question/answer} data files
+      batch_size: int. how big to make the batches
+      context_len, question_len: max length of context and question respectively
+      discard_long: If True, discard any examples that are longer than context_len or question_len.
+        If False, truncate those exmaples instead.
+    """
+    context_file, qn_file, ans_file = open(context_path,encoding='utf-8'), open(qn_path,encoding='utf-8'), open(ans_path,encoding='utf-8')
+    batches = []
+
+    while True:
+        if len(batches) == 0: # add more batches
+            refill_batches(batches, word2id_glove, context_file, qn_file, ans_file, batch_size, context_len, question_len, discard_long)
+        if len(batches) == 0:
+            break
+
+        # Get next batch. These are all lists length batch_size
+        (context_ids, context_tokens, qn_ids, qn_tokens, ans_span, ans_tokens) = batches.pop(0)
+
+        # Pad context_ids and qn_ids
+        qn_ids = padded(qn_ids, question_len) # pad questions to length question_len
+        context_ids = padded(context_ids, context_len) # pad contexts to length context_len
+        context_glove=convert_ids_to_word_vectors(context_ids,emb_matrix_glove)
+        qn_glove = convert_ids_to_word_vectors(qn_ids, emb_matrix_glove)
+        context_glove=np.array(context_glove)
+        qn_glove=np.array(qn_glove)
+
+        # Make qn_ids into a np array and create qn_mask
+        qn_ids = np.array(qn_ids) # shape (batch_size, question_len)
+        qn_mask = (qn_ids != PAD_ID).astype(np.int32) # shape (batch_size, question_len)
+
+        # Make context_ids into a np array and create context_mask
+        context_ids = np.array(context_ids) # shape (batch_size, context_len)
+        context_mask = (context_ids != PAD_ID).astype(np.int32) # shape (batch_size, context_len)
+
+        # Make ans_span into a np array
+        ans_span = np.array(ans_span) # shape (batch_size, 2)
+
+        # Make into a Batch object
+        batch = Batch(context_ids, context_mask, context_tokens,context_glove, qn_ids, qn_mask, qn_tokens,qn_glove, ans_span, ans_tokens)
+
+        yield batch
+
+    return

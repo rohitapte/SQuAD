@@ -38,7 +38,11 @@ def readnext(x):
     else:
         return x.pop(0)
 
-
+def convert_ids_to_word_vectors(word_ids,emb_matrix_word):
+    retval=[]
+    for id in word_ids:
+        retval.append(emb_matrix_word[id].tolist())
+    return retval
 
 def refill_batches(batches, word2id, qn_uuid_data, context_token_data, qn_token_data, batch_size, context_len, question_len):
     """
@@ -95,7 +99,7 @@ def refill_batches(batches, word2id, qn_uuid_data, context_token_data, qn_token_
 
 
 
-def get_batch_generator(word2id, qn_uuid_data, context_token_data, qn_token_data, batch_size, context_len, question_len):
+def get_batch_generator(word2id,emb_matrix_glove, qn_uuid_data, context_token_data, qn_token_data, batch_size, context_len, question_len):
     """
     This is similar to get_batch_generator in data_batcher.py, but with some
     differences (see explanation in refill_batches).
@@ -124,6 +128,10 @@ def get_batch_generator(word2id, qn_uuid_data, context_token_data, qn_token_data
         # Pad context_ids and qn_ids
         qn_ids = padded(qn_ids, question_len) # pad questions to length question_len
         context_ids = padded(context_ids, context_len) # pad contexts to length context_len
+        context_glove = convert_ids_to_word_vectors(context_ids, emb_matrix_glove)
+        qn_glove = convert_ids_to_word_vectors(qn_ids, emb_matrix_glove)
+        context_glove = np.array(context_glove)
+        qn_glove = np.array(qn_glove)
 
         # Make qn_ids into a np array and create qn_mask
         qn_ids = np.array(qn_ids)
@@ -134,7 +142,7 @@ def get_batch_generator(word2id, qn_uuid_data, context_token_data, qn_token_data
         context_mask = (context_ids != PAD_ID).astype(np.int32)
 
         # Make into a Batch object
-        batch = Batch(context_ids, context_mask, context_tokens, qn_ids, qn_mask, qn_tokens=None, ans_span=None, ans_tokens=None, uuids=uuids)
+        batch = Batch(context_ids, context_mask, context_tokens,context_glove, qn_ids, qn_mask, qn_tokens=None,qn_glove=None, ans_span=None, ans_tokens=None, uuids=uuids)
 
         yield batch
 
@@ -164,7 +172,7 @@ def preprocess_dataset(dataset):
         article_paragraphs = dataset['data'][articles_id]['paragraphs']
         for pid in range(len(article_paragraphs)):
 
-            context = str(article_paragraphs[pid]['context']) # string
+            context = unicode(article_paragraphs[pid]['context']) # string
 
             # The following replacements are suggested in the paper
             # BidAF (Seo et al., 2016)
@@ -180,7 +188,7 @@ def preprocess_dataset(dataset):
             for qn in qas:
 
                 # read the question text and tokenize
-                question = str(qn['question']) # string
+                question = unicode(qn['question']) # string
                 question_tokens = tokenize(question) # list of strings
 
                 # also get the question_uuid

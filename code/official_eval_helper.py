@@ -142,7 +142,7 @@ def get_batch_generator(word2id,emb_matrix_glove, qn_uuid_data, context_token_da
         context_mask = (context_ids != PAD_ID).astype(np.int32)
 
         # Make into a Batch object
-        batch = Batch(context_ids, context_mask, context_tokens,context_glove, qn_ids, qn_mask, qn_tokens=None,qn_glove=None, ans_span=None, ans_tokens=None, uuids=uuids)
+        batch = Batch(context_ids, context_mask, context_tokens,context_glove, qn_ids, qn_mask, qn_tokens=None,qn_glove_vectors=qn_glove, ans_span=None, ans_tokens=None, uuids=uuids)
 
         yield batch
 
@@ -172,7 +172,7 @@ def preprocess_dataset(dataset):
         article_paragraphs = dataset['data'][articles_id]['paragraphs']
         for pid in range(len(article_paragraphs)):
 
-            context = unicode(article_paragraphs[pid]['context']) # string
+            context = str(article_paragraphs[pid]['context']) # string
 
             # The following replacements are suggested in the paper
             # BidAF (Seo et al., 2016)
@@ -188,7 +188,7 @@ def preprocess_dataset(dataset):
             for qn in qas:
 
                 # read the question text and tokenize
-                question = unicode(qn['question']) # string
+                question = str(qn['question']) # string
                 question_tokens = tokenize(question) # list of strings
 
                 # also get the question_uuid
@@ -230,7 +230,7 @@ def get_json_data(data_filename):
     return qn_uuid_data, context_token_data, qn_token_data
 
 
-def generate_answers(session, model, word2id, qn_uuid_data, context_token_data, qn_token_data):
+def generate_answers(session, model, word2id,emb_matrix_glove, qn_uuid_data, context_token_data, qn_token_data):
     """
     Given a model, and a set of (context, question) pairs, each with a unique ID,
     use the model to generate an answer for each pair, and return a dictionary mapping
@@ -253,7 +253,7 @@ def generate_answers(session, model, word2id, qn_uuid_data, context_token_data, 
 
     print ("Generating answers...")
 
-    for batch in get_batch_generator(word2id, qn_uuid_data, context_token_data, qn_token_data, model.FLAGS.batch_size, model.FLAGS.context_len, model.FLAGS.question_len):
+    for batch in get_batch_generator(word2id,emb_matrix_glove, qn_uuid_data, context_token_data, qn_token_data, model.FLAGS.batch_size, model.FLAGS.context_len, model.FLAGS.question_len):
 
         # Get the predicted spans
         pred_start_batch, pred_end_batch = model.get_start_end_pos(session, batch)

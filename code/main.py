@@ -193,12 +193,12 @@ def main(unused_argv):
 
             # Get a predicted answer for each example in the data
             # Return a mapping answers_dict from uuid to answer
-            answers_dict = generate_answers(sess, qa_model, word2id, qn_uuid_data, context_token_data, qn_token_data)
+            answers_dict = generate_answers(sess, qa_model, word2id,emb_matrix, qn_uuid_data, context_token_data, qn_token_data)
 
             # Write the uuid->answer mapping a to json file in root dir
             print ("Writing predictions to %s..." % FLAGS.json_out_path)
             with io.open(FLAGS.json_out_path, 'w', encoding='utf-8') as f:
-                f.write(unicode(json.dumps(answers_dict, ensure_ascii=False)))
+                f.write(str(json.dumps(answers_dict, ensure_ascii=False)))
                 print ("Wrote predictions to %s" % FLAGS.json_out_path)
 
 

@@ -25,6 +25,7 @@ import re
 import numpy as np
 from six.moves import xrange
 from nlp_functions.word_and_character_vectors import UNK_ID, PAD_ID
+from nlp_functions.sentence_operations import split_by_whitespace,sentence_to_word_ids,pad_words,convert_ids_to_word_vectors
 
 class Batch(object):
     """A class to hold the information needed for a training batch"""
@@ -59,11 +60,11 @@ class Batch(object):
         self.batch_size = len(self.context_tokens)
 
 
-def split_by_whitespace(sentence):
-    words = []
-    for space_separated_fragment in sentence.strip().split():
-        words.extend(re.split(" ", space_separated_fragment))
-    return [w for w in words if w]
+#def split_by_whitespace(sentence):
+#    words = []
+#    for space_separated_fragment in sentence.strip().split():
+#        words.extend(re.split(" ", space_separated_fragment))
+#    return [w for w in words if w]
 
 
 def intstr_to_intlist(string):
@@ -71,40 +72,40 @@ def intstr_to_intlist(string):
     return [int(s) for s in string.split()]
 
 
-def sentence_to_token_ids(sentence, word2id):
-    """Turns an already-tokenized sentence string into word indices
-    e.g. "i do n't know" -> [9, 32, 16, 96]
-    Note any token that isn't in the word2id mapping gets mapped to the id for UNK
-    """
-    tokens = split_by_whitespace(sentence) # list of strings
-    ids = [word2id.get(w, UNK_ID) for w in tokens]
-    return tokens, ids
+#def sentence_to_token_ids(sentence, word2id):
+#    """Turns an already-tokenized sentence string into word indices
+#    e.g. "i do n't know" -> [9, 32, 16, 96]
+#    Note any token that isn't in the word2id mapping gets mapped to the id for UNK
+#    """
+#    tokens = split_by_whitespace(sentence) # list of strings
+#    ids = [word2id.get(w, UNK_ID) for w in tokens]
+#    return tokens, ids
 
 
-def padded(token_batch, batch_pad=0):
-    """
-    Inputs:
-      token_batch: List (length batch size) of lists of ints.
-      batch_pad: Int. Length to pad to. If 0, pad to maximum length sequence in token_batch.
-    Returns:
-      List (length batch_size) of padded of lists of ints.
-        All are same length - batch_pad if batch_pad!=0, otherwise the maximum length in token_batch
-    """
-    if batch_pad == 0:
-        maxlen = max([len(token) for token in token_batch])
-    else:
-        maxlen = batch_pad
-    retval = []
-    for token in token_batch:
-        newtoken = token + [PAD_ID] * (maxlen - len(token))
-        retval.append(newtoken)
-    return retval
+#def padded(token_batch, batch_pad=0):
+#    """
+#    Inputs:
+#      token_batch: List (length batch size) of lists of ints.
+#      batch_pad: Int. Length to pad to. If 0, pad to maximum length sequence in token_batch.
+#    Returns:
+#      List (length batch_size) of padded of lists of ints.
+#        All are same length - batch_pad if batch_pad!=0, otherwise the maximum length in token_batch
+#    """
+#    if batch_pad == 0:
+#        maxlen = max([len(token) for token in token_batch])
+#    else:
+#        maxlen = batch_pad
+#    retval = []
+#    for token in token_batch:
+#        newtoken = token + [PAD_ID] * (maxlen - len(token))
+#        retval.append(newtoken)
+#    return retval
 
-def convert_ids_to_word_vectors(word_ids,emb_matrix_word):
-    retval=[]
-    for id in word_ids:
-        retval.append(emb_matrix_word[id].tolist())
-    return retval
+#def convert_ids_to_word_vectors(word_ids,emb_matrix_word):
+#    retval=[]
+#    for id in word_ids:
+#        retval.append(emb_matrix_word[id].tolist())
+#    return retval
 
 def refill_batches(batches,word2id_glove,context_file,qn_file,ans_file, batch_size, context_len, question_len, discard_long):
     """
@@ -127,8 +128,10 @@ def refill_batches(batches,word2id_glove,context_file,qn_file,ans_file, batch_si
     while context_line and qn_line and ans_line: # while you haven't reached the end
 
         # Convert tokens to word ids
-        context_tokens, context_ids = sentence_to_token_ids(context_line, word2id_glove)
-        qn_tokens, qn_ids = sentence_to_token_ids(qn_line, word2id_glove)
+        #context_tokens, context_ids = sentence_to_token_ids(context_line, word2id_glove)
+        #qn_tokens, qn_ids = sentence_to_token_ids(qn_line, word2id_glove)
+        context_tokens, context_ids = sentence_to_word_ids(context_line, word2id_glove)
+        qn_tokens, qn_ids = sentence_to_word_ids(qn_line, word2id_glove)
         ans_span = intstr_to_intlist(ans_line)
 
         # read the next line from each file
@@ -211,8 +214,10 @@ def get_batch_generator(word2id_glove,emb_matrix_glove, context_path, qn_path, a
         (context_ids, context_tokens, qn_ids, qn_tokens, ans_span, ans_tokens) = batches.pop(0)
 
         # Pad context_ids and qn_ids
-        qn_ids = padded(qn_ids, question_len) # pad questions to length question_len
-        context_ids = padded(context_ids, context_len) # pad contexts to length context_len
+        #qn_ids = padded(qn_ids, question_len) # pad questions to length question_len
+        #context_ids = padded(context_ids, context_len) # pad contexts to length context_len
+        qn_ids = pad_words(qn_ids, question_len)  # pad questions to length question_len
+        context_ids = pad_words(context_ids, context_len) # pad contexts to length context_len
         context_glove=convert_ids_to_word_vectors(context_ids,emb_matrix_glove)
         qn_glove = convert_ids_to_word_vectors(qn_ids, emb_matrix_glove)
         context_glove=np.array(context_glove)

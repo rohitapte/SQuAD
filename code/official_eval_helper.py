@@ -27,8 +27,8 @@ from nltk.tokenize.moses import MosesDetokenizer
 
 from preprocessing.squad_preprocess import data_from_json, tokenize
 from nlp_functions.word_and_character_vectors import UNK_ID, PAD_ID
-from data_batcher import padded, Batch
-
+#from data_batcher import padded, Batch
+from nlp_functions.sentence_operations import split_by_whitespace,sentence_to_word_ids,pad_words,convert_ids_to_word_vectors
 
 
 def readnext(x):
@@ -126,8 +126,11 @@ def get_batch_generator(word2id,emb_matrix_glove, qn_uuid_data, context_token_da
         (uuids, context_tokens, context_ids, qn_ids) = batches.pop(0)
 
         # Pad context_ids and qn_ids
-        qn_ids = padded(qn_ids, question_len) # pad questions to length question_len
-        context_ids = padded(context_ids, context_len) # pad contexts to length context_len
+        #qn_ids = padded(qn_ids, question_len) # pad questions to length question_len
+        #context_ids = padded(context_ids, context_len) # pad contexts to length context_len
+        qn_ids = pad_words(qn_ids, question_len)  # pad questions to length question_len
+        context_ids = pad_words(context_ids, context_len) # pad contexts to length context_len
+
         context_glove = convert_ids_to_word_vectors(context_ids, emb_matrix_glove)
         qn_glove = convert_ids_to_word_vectors(qn_ids, emb_matrix_glove)
         context_glove = np.array(context_glove)

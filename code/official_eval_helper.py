@@ -28,6 +28,7 @@ from nltk.tokenize.moses import MosesDetokenizer
 from preprocessing.squad_preprocess import data_from_json, tokenize
 from nlp_functions.word_and_character_vectors import UNK_ID, PAD_ID
 #from data_batcher import padded, Batch
+from data_batcher import Batch
 from nlp_functions.sentence_operations import split_by_whitespace,sentence_to_word_ids,pad_words,convert_ids_to_word_vectors
 
 

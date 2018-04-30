@@ -88,11 +88,11 @@ class QAModel(object):
         # These are all batch-first: the None corresponds to batch_size and
         # allows you to run the same model with variable batch_size
         self.context_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
-        self.context_glove=tf.placeholder(tf.float32,shape=[None,self.FLAGS.context_len,self.FLAGS.embedding_size])
+        self.context_glove=tf.placeholder(tf.float32,shape=[None,self.FLAGS.context_len,self.FLAGS.glove_embedding_size])
         self.context_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
         self.qn_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
         self.qn_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
-        self.qn_glove = tf.placeholder(tf.float32, shape=[None, self.FLAGS.question_len, self.FLAGS.embedding_size])
+        self.qn_glove = tf.placeholder(tf.float32, shape=[None, self.FLAGS.question_len, self.FLAGS.glove_embedding_size])
         self.ans_span = tf.placeholder(tf.int32, shape=[None, 2])
 
         # Add a placeholder to feed in the keep probability (for dropout).
@@ -105,18 +105,18 @@ class QAModel(object):
         Adds word embedding layer to the graph.
 
         Inputs:
-          emb_matrix: shape (400002, embedding_size).
+          emb_matrix: shape (400002, glove_embedding_size).
             The GloVe vectors, plus vectors for PAD and UNK.
         """
         with vs.variable_scope("embeddings"):
 
             # Note: the embedding matrix is a tf.constant which means it's not a trainable parameter
-            embedding_matrix = tf.constant(emb_matrix, dtype=tf.float32, name="emb_matrix") # shape (400002, embedding_size)
+            embedding_matrix = tf.constant(emb_matrix, dtype=tf.float32, name="emb_matrix") # shape (400002, glove_embedding_size)
 
             # Get the word embeddings for the context and question,
             # using the placeholders self.context_ids and self.qn_ids
-            self.context_embs = embedding_ops.embedding_lookup(embedding_matrix, self.context_ids) # shape (batch_size, context_len, embedding_size)
-            self.qn_embs = embedding_ops.embedding_lookup(embedding_matrix, self.qn_ids) # shape (batch_size, question_len, embedding_size)
+            self.context_embs = embedding_ops.embedding_lookup(embedding_matrix, self.context_ids) # shape (batch_size, context_len, glove_embedding_size)
+            self.qn_embs = embedding_ops.embedding_lookup(embedding_matrix, self.qn_ids) # shape (batch_size, question_len, glove_embedding_size)
 
 
     def build_graph(self):

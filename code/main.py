@@ -124,7 +124,12 @@ def main(unused_argv):
     # Load embedding matrix and vocab mappings
     #emb_matrix, word2id, id2word = get_glove(FLAGS.glove_path, FLAGS.embedding_size)
     #emb_matrix, word2id, id2word = get_glove('/home/rohitapte/Documents/ml_data_files')
-    emb_matrix, word2id, id2word = get_glove('c:\\Users\\tihor\\Documents\\ml_data_files')
+    if sys.platform=='win32':
+        DATA_PATH='c:\\Users\\tihor\\Documents\\ml_data_files'
+    else:
+        DATA_PATH='/home/rohitapte/Documents/ml_data_files'
+    emb_matrix, word2id, id2word = get_glove(DATA_PATH)
+
 
     # Get filepaths to train/dev datafiles for tokenized queries, contexts and answers
     train_context_path = os.path.join(FLAGS.data_dir, "train.context")

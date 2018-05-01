@@ -134,7 +134,7 @@ class QAModel(object):
         # Note: here the RNNEncoder is shared (i.e. the weights are the same)
         # between the context and the question.
         #encoder = RNNEncoder(self.FLAGS.hidden_size, self.keep_prob)
-        encoder = BiRNNLayer(self.FLAGS.hidden_size, self.keep_prob,'LSTM')
+        encoder = BiRNNLayer('ContextQuestionRNN',self.FLAGS.hidden_size, self.keep_prob,'LSTM')
         #context_hiddens = encoder.build_graph(self.context_embs, self.context_mask) # (batch_size, context_len, hidden_size*2)
         context_hiddens = encoder.build_graph(self.context_glove,self.context_mask)  # (batch_size, context_len, hidden_size*2)
         #question_hiddens = encoder.build_graph(self.qn_embs, self.qn_mask) # (batch_size, question_len, hidden_size*2)

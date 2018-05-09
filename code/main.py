@@ -28,7 +28,7 @@ import sys
 sys.path.append('../../python_libraries')
 sys.path.append('../python_libraries')
 
-from qa_model import QAModel
+from qa_model_cnn import QAModel
 #from vocab import get_glove
 from nlp_functions.word_and_character_vectors import get_glove
 from official_eval_helper import get_json_data, generate_answers
